@@ -77,7 +77,7 @@ async def vapi_dashboard_data():
     except httpx.RequestError as exc:
         raise HTTPException(status_code=500, detail="Failed to connect to external API")
     except httpx.TimeoutException:
-        raise HTTPException(status_code=504, detail="External API request timed out")
+        raise HTTPException(status_code=504, detail="External API request timed out") ###########
 
 
 
