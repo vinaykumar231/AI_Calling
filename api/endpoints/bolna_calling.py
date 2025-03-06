@@ -7,6 +7,7 @@ from fastapi import FastAPI, HTTPException
 import pytz
 import requests
 from pydantic import BaseModel
+from api.endpoints.Email_config import send_low_balance_email
 from api.models import ProcessedExecution
 from api.models.payment_data import UserBalance, check_user_balance
 from api.models.user import AI_calling
@@ -17,8 +18,12 @@ import os
 from tempfile import NamedTemporaryFile
 from sqlalchemy.orm import Session
 from database import get_db
+from sqlalchemy.exc import IntegrityError
 
 router = APIRouter()
+
+utc_now = pytz.utc.localize(datetime.utcnow())
+ist_now = utc_now.astimezone(pytz.timezone('Asia/Kolkata'))
 
 BOLNA_API_URL = "https://api.bolna.dev/agent/{agent_id}/executions"
 
@@ -43,7 +48,9 @@ async def get_agent_executions(
 
         response.raise_for_status()
         result = response.json()
-
+    
+    except HTTPException as http_exc:
+        raise http_exc
     except httpx.HTTPStatusError as e:
         if e.response.status_code == 400:
             raise HTTPException(status_code=400, detail="Bad Request: Invalid agent_id")
@@ -57,7 +64,12 @@ async def get_agent_executions(
     user_balance = db.query(UserBalance).filter(UserBalance.user_id == current_user.user_id).first()
     
     if not user_balance:
-        raise HTTPException(status_code=404, detail="User balance record not found")
+        user_balance = UserBalance(user_id=current_user.user_id, balance=0, last_email_sent=ist_now)  
+        db.add(user_balance)
+        db.commit()
+        db.refresh(user_balance)  
+
+        send_low_balance_email(user_email=current_user.user_email, user_name=current_user.user_name, balance=user_balance.balance)
 
     processed_ids = {p.execution_id for p in db.query(ProcessedExecution).filter_by(user_id=current_user.user_id).all()}
 
@@ -83,6 +95,7 @@ async def get_agent_executions(
         call_cost = r.get("total_cost", 0)
         extra_charge = round(call_cost  * 0.50, 2)  
         call_cost_with_extra = round(call_cost + extra_charge, 2)
+
         is_new_execution = execution_id not in processed_ids
 
         if is_new_execution and user_balance.balance >= (total_deduction + call_cost_with_extra):
@@ -129,7 +142,7 @@ async def get_agent_executions(
         user_balance.balance -= total_deduction
         db.bulk_save_objects(new_executions)  
         db.commit()
-
+        
     return {
         "total_calls": total_calls,
         "successful_calls": successful_calls,

@@ -4,7 +4,7 @@ from datetime import datetime
 from database import Base
 
 class ProcessedExecution(Base):
-    __tablename__ = "processed_executions"
+    __tablename__ = "processed_executions_tb"
     
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)
