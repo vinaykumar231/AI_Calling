@@ -143,8 +143,8 @@ def update_user(
     
 @router.put("/update_password/")
 def update_user(
-    password: str ,
-    new_password: str,
+    new_password: str ,
+    confirm_password: str,
     db: Session = Depends(get_db),
     current_user: AI_calling = Depends(get_current_user), 
 ):
@@ -153,13 +153,13 @@ def update_user(
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
         
-        if password and not AI_calling.validate_password(password):
+        if new_password and not AI_calling.validate_password(new_password):
             raise HTTPException(status_code=400, detail="Password must be at least 8 characters long")
 
-        if new_password and not AI_calling.validate_password(new_password):
+        if confirm_password and not AI_calling.validate_password(confirm_password):
             raise HTTPException(status_code=400, detail="new Password must be at least 8 characters long")
         
-        if password !=new_password:
+        if new_password != confirm_password:
             raise HTTPException(status_code=400, detail="Password does not match")
         
         user.user_password=new_password
