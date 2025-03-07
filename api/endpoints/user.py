@@ -140,6 +140,42 @@ def update_user(
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Unexpected error occurred while updating user details: {e}")
+    
+@router.put("/update_password/")
+def update_user(
+    password: str ,
+    new_password: str,
+    db: Session = Depends(get_db),
+    current_user: AI_calling = Depends(get_current_user), 
+):
+    try:
+        user = db.query(AI_calling).filter(AI_calling.user_id ==current_user.user_id).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        if password and not AI_calling.validate_password(password):
+            raise HTTPException(status_code=400, detail="Password must be at least 8 characters long")
+
+        if new_password and not AI_calling.validate_password(new_password):
+            raise HTTPException(status_code=400, detail="new Password must be at least 8 characters long")
+        
+        if password !=new_password:
+            raise HTTPException(status_code=400, detail="Password does not match")
+        
+        user.user_password=new_password
+
+        db.commit()
+        db.refresh(user)
+        return {"message": "Password updated successfully"}
+    except HTTPException as e:
+        raise e
+    except SQLAlchemyError:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Database error occurred while updating Password.")
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Unexpected error occurred while updating Password.")
+
 
 @router.get("/get_my_profile")
 def get_current_user_details(
